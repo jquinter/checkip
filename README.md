@@ -1,3 +1,4 @@
+# Checkip
 Checkip is simple script that checks to see if your external IP address changed and if so sends an email with the new IP address. It requires sendemail.
 
 Sendmail can be found here:
@@ -13,4 +14,5 @@ Examples:
 Once per hour:      0 * * * *			/usr/bin/checkip &> /dev/null
 Every four hours:   0 */4 * * *		/usr/bin/checkip &> /dev/null 
 
-Link to AUR package: https://aur.archlinux.org/packages/checkip
+##Links
+AUR package: https://aur.archlinux.org/packages/checkip
