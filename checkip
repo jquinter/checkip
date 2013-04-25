@@ -1,57 +1,204 @@
 #!/bin/bash
-. /etc/checkip.conf
+# By graysky <graysky AT archlinux DOT us>
+export BLD="\e[01m" RED="\e[01;31m" GRN="\e[01;32m" BLU="\e[01;34m" NRM="\e[00m"
+VERS="@VERSION@"
+CONFIGDIR="$HOME/.config/checkip"
+CONFIG="$CONFIGDIR/checkip.conf"
+DB="$CONFIGDIR/checkip.db"
+# Do not default log to $CONFIGDIR in case users wants it elsewhere
+LOG='checkip.log'
+
+makeconfig() {
+	cat > $CONFIG <<EOL
+#
+# $CONFIG
+#
+
+# Address to receive notifications.
+#TARGETEMAIL='youremail@foo.com'
+TARGETEMAIL=
+
+# Return address.
+#FROM='returnaddress@bar.com'
+FROM=
+
+# SMTP server.
+#SMTP='smtp.bar.com'
+SMTP=
+
+# Your username.
+#USERNAME='myusername'
+USERNAME=
+
+# Your email password.
+# Note that permissions of this file should be 600 to prevent other users
+# on the system from reading this plain text file with your precious password.
+#SMTP_USER_PASS='mypassword'
+SMTP_USER_PASS=
+
+# Select which method of authentication you wish to use when sending mails.
+# Valid options are shown below; select one.
+# SSL uses port 465 while STARTTL uses port 587
+#
+#AUTHMODE='SSL'
+#AUTHMODE='STARTTLS'
+AUTHMODE=
+
+# Path to log file.
+LOG="$CONFIGDIR/$LOG"
+
+#LOG="/var/log/$LOG"
+# Note that users wishing to redefine the log from their homedir to /var/log
+# MUST create this file manually and chown it to your user!
+#
+# Example:
+# 	touch /var/log/$LOG
+# 	chown user:group /var/log/$LOG
+
+# Optionally define an http proxy if behind a firewall.
+# This is only used for curl as it gets your IP address.
+#PROXY="myproxy:myport"
+EOL
+	chmod 600 "$CONFIG"
+}
 
 sendmail() {
-	# add proxy line below
-	sendEmail -f ${from} -t ${email} -s ${smtp} -u "IP Changed" -m "New ip is ${currentip}"
-}
-
-checkip() {
-	if [[ ! -f $HOME/.oldip ]]; then
-		echo "No old IP on record so getting it now and writting to database."
-		echo $(curl ${proxy} -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//') > $HOME/.oldip
-		oldip=$(cat $HOME/.oldip)
+	OPTS="-to $TARGETEMAIL -from $FROM -auth -smtp $SMTP +cc +bc -user $USERNAME -pass $SMTP_USER_PASS"
+	
+	if [[ -z "$TESTMODE"  ]]; then
+		CURRENTIP=$(cat $DB)
 	else
-		oldip=$(cat $HOME/.oldip)
+		# we are in test mode and the db may not yet exist
+		CURRENTIP="TEST MODE ONLY"
 	fi
+
+	case "$AUTHMODE" in
+		SSL)
+			mailsend -ssl -port 465 $OPTS -sub "IP address" -M "IP is $CURRENTIP"
+			;;
+		STARTTLS)
+			mailsend -starttls -port 587 $OPTS -sub "IP address" -M "IP is $CURRENTIP"
+			;;
+		NONE)
+			echo 'TODO'
+			;;
+		*)
+			exit 1
+	esac
 }
 
-updateold() {
-	echo Current IP different from old IP so updating record in database.
-	echo ${currentip} > $HOME/.oldip
+dotest() {
+	OPTS="-v -info -smtp $SMTP"
+	case "$AUTHMODE" in
+		SSL)
+			mailsend -ssl -port 465 $OPTS
+      ;;
+    STARTTLS)
+      mailsend -port 587 $OPTS
+      ;;
+    NONE)
+      echo 'TODO'
+      ;;
+    *)
+			exit 1
+	esac
+}
+
+run() {
+	NOW=$(date "+%m-%d-%Y %H:%M:%S")
+	
+	if [[ ! -f "$DB" ]]; then
+		echo -e ${BLD}" No old IP on record so getting it now and writting to database."${NRM}
+		echo $(curl "$PROXY" -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//') > "$DB"
+		OLDIP=$(cat "$DB")
+		exit 0
+	else
+		OLDIP=$(cat "$DB")
+	fi
+	
+	CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
+
+	if [[ -z "$CURRENTIP" ]]; then
+		# net up or down
+		CHECK="WAN or website down, no action taken."
+		echo -e ${BLD}${RED}" Null value detected. Either www.whatsmyup.us is down or your net is down."${NRM}
+		writelog
+		exit 1
+	fi 
+
+	if [[ "$CURRENTIP" != "$OLDIP" ]]; then
+		# IP changed
+		CHECK="IP changed, sending mail and updateding db."
+		echo -e ${BLD}" Current IP differs from IP in database so notifying and updating database."${NRM}
+		writelog
+		echo "$CURRENTIP" > "$DB"
+		sendmail
+	else
+		# no change
+		CHECK="No change to IP detected, no action taken."
+		echo -e ${BLD}" IP matches IP on record so taking no action."${NRM}
+		writelog
+	fi
 }
 
 writelog() {
-	if [[ ! -f ${log} ]]; then
-		echo -e "Date/Time \t\t Action" > ${log}
-	fi
-	echo -e "${now} \t ${check}" >> ${log}
+	[[ ! -f "$LOG" ]] && echo -e "Date/Time \t\t Action" > "$LOG"
+	echo -e "$NOW \t $CHECK" >> "$LOG"
 }
 
-now=$(date "+%m-%d-%Y %H:%M:%S")
+checkconfig() {
+	[[ -z $(which mailsend) ]] && echo -e "${RED}Error!${NRM}${BLD} This script requires mailsend to function." && exit 1
+	[[ -z $(which curl) ]] && echo -e "${RED}Error!${NRM}${BLD} This script requires curl to function." && exit 1
+	[[ ! -d "$CONFIGDIR" ]] && mkdir "$CONFIGDIR"
+	if [[ ! -f "$CONFIG" ]]; then
+		makeconfig
+		echo -e " ${BLD}No config file detected so a fresh one has been created."${NRM}
+		echo -e " ${BLD}Please edit it now: ${BLU}$CONFIG"${NRM}
+		exit 0
+	else
+		source "$CONFIG"
+		[[ -z "$TARGETEMAIL" ]] && echo -e ${RED}" Error in config! Define a target email address."${NRM} && exit 1
+		[[ -z "$FROM" ]] && echo -e ${RED}" Error in config! Define a return address."${NRM} && exit 1
+		[[ -z "$SMTP" ]] && echo -e ${RED}" Error in config! Define a STMP server."${NRM} && exit 1
+		[[ -z "$USERNAME" ]] && echo -e ${RED}" Error in config! Define a username."${NRM} && exit 1
+		[[ -z "$SMTP_USER_PASS" ]] && echo -e ${RED}" Error in config! Define a password."${NRM} && exit 1
+		[[ -z "$AUTHMODE" ]] && echo -e ${RED}" Error in config! Define an authentication mode."${NRM} && exit 1
+	fi
+}
 
-echo "Checking IP against database."
-checkip
-currentip=$(curl ${proxy} -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
+greets() {
+	echo -e "${RED}Checkip v$VERS${NRM}"
+	echo
+}
 
-if [[ -z ${currentip} ]]; then
-	# net up or down
-	check="WAN or website down, no action taken."
-	echo "Null value detected so your internet is likely down."
-	writelog
-	exit 1
-fi 
+case "$1" in
+	mail|m|M|Mail)
+		greets
+		checkconfig
+		echo -e "${BLD}${RED}Sending test email..."${NRM}${BLD}
+		export TESTMODE=1
+		sendmail
+		;;
+	test|t|T|Test)
+		greets
+		checkconfig
+		echo -e "${BLD}${RED}Testing SMTP server..."${NRM}${BLD}
+		dotest
+		;;
+	check|c|C|Check)
+		greets
+		checkconfig
+		run
+		;;
+	*)
+		greets
+		checkconfig
+		echo -e " ${BLD}$0 ${NRM}${GRN}[option]${NRM}"
+		echo -e " ${BLD} ${NRM}${GRN}test${NRM}${BLD}	Test smtp server defined in ${NRM}${BLU}${CONFIG}${NRM}${BLD} then exit."${NRM}
+		echo -e " ${BLD} ${NRM}${GRN}mail${NRM}${BLD}	Send a test email and exit."${NRM}
+		echo -e " ${BLD} ${NRM}${GRN}check${NRM}${BLD}	Check IP against IP on record and send mail if different."${NRM}
+		;;
+esac
+exit 0
 
-if [[ ${currentip} != ${oldip} ]]; then
-	# IP changed
-	check="IP changed, sending mail and updateding db."
-	echo "Current IP differs from IP in database so notifying and updating database."
-	sendmail
-	updateold
-	writelog
-else
-	# no change
-	check="No change to IP detected, no action taken."
-	echo "IP matches IP on record so taking no action."
-	writelog
-fi
+#vim:set ts=2 sw=2 et:
