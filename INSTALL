@@ -1,0 +1,19 @@
+There is no configure script nor is there anything to compile.
+
+Setup the via a make.
+
+ $ make
+
+Running a `make install` as root will distribute the files to
+the filesystem.
+
+ # make install
+
+It is highly discouraged to manually build this on Arch Linux.
+Instead, use the PKGBUILD in the AUR so the resulting package
+can be managed by pacman:
+https://aur.archlinux.org/packages/checkip
+
+If you wish to contribute to other distros, fork this project
+on github and submit a pull request:
+https://github.com/graysky2/checkip
