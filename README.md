@@ -5,7 +5,7 @@ Checkip is simple (and lightweight) script that checks to see if your external I
 * [Mailsend](https://code.google.com/p/mailsend/)
 * Curl
 
-Arch Linux user may compile Mailsend from AUR:
+Arch Linux users may compile Mailsend from AUR:
 * [Mailsend-dev](https://aur.archlinux.org/packages/mailsend-dev/)
 
 ##Links
