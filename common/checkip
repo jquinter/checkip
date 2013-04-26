@@ -52,19 +52,19 @@ LOG="$CONFIGDIR/$LOG"
 # MUST create this file manually and chown it to your user!
 #
 # Example:
-# 	touch /var/log/$LOG
-# 	chown user:group /var/log/$LOG
+#   touch /var/log/$LOG
+#   chown user:group /var/log/$LOG
 
 # Optionally define an http proxy if behind a firewall.
 # This is only used for curl as it gets your IP address.
 #PROXY="myproxy:myport"
 EOL
-	chmod 600 "$CONFIG"
+  chmod 600 "$CONFIG"
 }
 
 sendmail() {
 	OPTS="-to $TARGETEMAIL -from $FROM -auth -smtp $SMTP +cc +bc -user $USERNAME -pass $SMTP_USER_PASS"
-	
+
 	if [[ -z "$TESTMODE"  ]]; then
 		CURRENTIP=$(cat $DB)
 	else
@@ -92,21 +92,21 @@ dotest() {
 	case "$AUTHMODE" in
 		SSL)
 			mailsend -ssl -port 465 $OPTS
-      ;;
-    STARTTLS)
-      mailsend -port 587 $OPTS
-      ;;
-    NONE)
-      echo 'TODO'
-      ;;
-    *)
+			;;
+		STARTTLS)
+			mailsend -port 587 $OPTS
+			;;
+		NONE)
+			echo 'TODO'
+			;;
+		*)
 			exit 1
 	esac
 }
 
 run() {
 	NOW=$(date "+%m-%d-%Y %H:%M:%S")
-	
+
 	if [[ ! -f "$DB" ]]; then
 		echo -e ${BLD}" No old IP on record so getting it now and writting to database."${NRM}
 		echo $(curl "$PROXY" -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//') > "$DB"
@@ -115,7 +115,7 @@ run() {
 	else
 		OLDIP=$(cat "$DB")
 	fi
-	
+
 	CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
 
 	if [[ -z "$CURRENTIP" ]]; then
