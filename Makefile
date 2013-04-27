@@ -1,4 +1,4 @@
-VERSION = 2.01
+VERSION = 2.03
 PN = checkip
 
 PREFIX ?= /usr
