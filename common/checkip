@@ -18,14 +18,6 @@ makeconfig() {
 #TARGETEMAIL='youremail@foo.com'
 TARGETEMAIL=
 
-# Return address.
-#FROM='returnaddress@bar.com'
-FROM=
-
-# SMTP server.
-#SMTP='smtp.bar.com'
-SMTP=
-
 # Your username.
 #USERNAME='myusername'
 USERNAME=
@@ -35,6 +27,14 @@ USERNAME=
 # on the system from reading this plain text file with your precious password.
 #SMTP_USER_PASS='mypassword'
 SMTP_USER_PASS=
+
+# Return address.
+#FROM='returnaddress@bar.com'
+FROM=
+
+# SMTP server.
+#SMTP='smtp.bar.com'
+SMTP=
 
 # Select which method of authentication you wish to use when sending mails.
 # Valid options are shown below; select one.
@@ -116,12 +116,26 @@ run() {
 		OLDIP=$(cat "$DB")
 	fi
 
+	# Get the IP address
+	# Script tries three different websites to do so:
+	# 1. http://www.whatsmyip.us
+	# 2. http://icanhazip.com
+	# 3. http://ifconfig.me
+
 	CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
+	
+	if [[ -z "$CURRENTIP" ]]; then
+		CURRENTIP=$(curl $PROXY -s http://icanhazip.com/)
+	fi
+	
+	if [[ -z "$CURRENTIP" ]]; then
+		CURRENTIP=$(curl $PROXY -s http://ifconfig.me/)
+	fi
 
 	if [[ -z "$CURRENTIP" ]]; then
 		# net up or down
-		CHECK="WAN or website down, no action taken."
-		echo -e ${BLD}${RED}" Null value detected. Either www.whatsmyup.us is down or your net is down."${NRM}
+		CHECK="WAN or websites are down, no action taken."
+		echo -e ${BLD}${RED}" Null value detected."${NRM}
 		writelog
 		exit 1
 	fi 
