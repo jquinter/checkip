@@ -10,12 +10,12 @@ DB="$CONFIGDIR/checkip.db"
 export BLD="\e[01m" RED="\e[01;31m" GRN="\e[01;32m" BLU="\e[01;34m" NRM="\e[00m"
 
 command -v curl >/dev/null 2>&1 || {
-echo "I require curl but it's not installed. Aborting." >&2
+echo -e ${RED}"I require curl but it's not installed. Aborting."${NRM} >&2
 exit 1; }
 
 makeconfig() {
 	if [[ ! -f $SKEL ]]; then
-		echo -e "${RED}$SKEL is missing. Reinstall this package to continue."
+		echo -e "${RED}$SKEL is missing. Reinstall this package to continue."${NRM}
 		exit 1
 	fi
 
@@ -27,7 +27,7 @@ makeconfig() {
 		echo -e ${BLD}" Edit this file before invoking $0 again."${NRM}
 		echo -e ${BLD}'------------------------------------------------------------'${NRM}
 		[[ ! -d "$CONFIGDIR" ]] && mkdir -p "$CONFIGDIR"
-		install -m600 $SKEL $CONFIG
+		install -m600 "$SKEL" "$CONFIG"
 		exit 0
 	fi
 }
@@ -94,7 +94,7 @@ sendmail() {
 		esac
 	elif [[ "$SCRIPTMAILCLIENT" = "mailx" ]]; then
 		# we are using mailx
-		echo "$CURRENTIP" | mailx -A "$MAILX_ACCOUNT_NAME" -s "IP Address" $TARGETEMAIL
+		echo "$CURRENTIP" | mailx -A "$MAILX_ACCOUNT_NAME" -s "IP Address" "$TARGETEMAIL"
 	fi
 }
 
@@ -129,7 +129,7 @@ run() {
 	if [[ -z "$CURRENTIP" ]]; then
 		# net up or down
 		CHECK="WAN or websites are down, no action taken."
-		echo -e ${BLD}${RED}" Null value detected."${NRM}
+		echo -e ${RED}" Null value detected."${NRM}
 		writelog
 		exit 1
 	fi 
