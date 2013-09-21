@@ -1,0 +1,63 @@
+#
+# $HOME/.config/checkip/checkip.conf
+#
+
+### BEGIN GLOBAL OPTION SECTION ###
+### This section contains options required for checkip to work.
+
+# Note that permissions of this file should be 600 to prevent other users
+# on the system from reading this plain text file with your precious password.
+
+# Path to log file.
+LOG="$HOME/.config/checkip/checkip.log"
+
+# Address to receive notifications.
+TARGETEMAIL='youremail@foo.com'
+
+# Set this variable to either mailx or mailsend to tell the script
+# which client you wish to use to send mails.
+# Valid options are either MAILCLIENT=mailx or MAILCLIENT=mailsend
+MAILCLIENT=
+
+### END GLOBAL OPTIONS SECTION ###
+
+
+
+### BEGIN MAILX OPTIONS SECTION ##
+### This section only applies to MAILCLIENT=mailx which you set above.
+
+# Define the account name you wish to use as the sender as defined in
+# ~/.mailrc that you already setup. See the man page for checkip for an example
+# using gmail.
+MAILX_ACCOUNT_NAME=gmail
+
+### End mailx options section ###
+
+
+
+### BEGIN MAILSEND OPTIONS SECTION ###
+### This section only applies to MAILCLIENT=mailsend which you set above.
+
+# Return address.
+FROM='returnaddress@bar.com'
+
+# SMTP server.
+SMTP='smtp.bar.com'
+
+# Your username.
+USERNAME='myusername'
+
+# Your email password.
+SMTP_USER_PASS='mypassword'
+
+# Select which method of authentication you wish to use when sending mails.
+# Valid options are shown below; select one.
+# SSL uses port 465 while STARTTL uses port 587.
+# Valid options are either AUTHMODE=SSL or AUTHMODE=STARTTLS
+AUTHMODE=
+
+# Optionally define an http proxy if behind a firewall.
+# This is only used for curl as it gets your IP address.
+# PROXY="myproxy:myport"
+
+### END MAILSEND OPTIONS SECTION ###

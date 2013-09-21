@@ -1,70 +1,73 @@
 #!/bin/bash
 # By graysky <graysky AT archlinux DOT us>
-export BLD="\e[01m" RED="\e[01;31m" GRN="\e[01;32m" BLU="\e[01;34m" NRM="\e[00m"
+
 VERS="@VERSION@"
+SKEL="/usr/share/checkip/checkip.conf.skel"
 CONFIGDIR="$HOME/.config/checkip"
 CONFIG="$CONFIGDIR/checkip.conf"
 DB="$CONFIGDIR/checkip.db"
-# Do not default log to $CONFIGDIR in case users wants it elsewhere
-LOG='checkip.log'
+
+export BLD="\e[01m" RED="\e[01;31m" GRN="\e[01;32m" BLU="\e[01;34m" NRM="\e[00m"
+
+command -v curl >/dev/null 2>&1 || {
+echo "I require curl but it's not installed. Aborting." >&2
+exit 1; }
 
 makeconfig() {
-	cat > $CONFIG <<EOL
-#
-# $CONFIG
-#
+	if [[ ! -f $SKEL ]]; then
+		echo -e "${RED}$SKEL is missing. Reinstall this package to continue."
+		exit 1
+	fi
 
-# Address to receive notifications.
-#TARGETEMAIL='youremail@foo.com'
-TARGETEMAIL=
+	if [[ ! -f "$CONFIG" ]]; then
+		echo -e ${BLD}'------------------------------------------------------------'${NRM}
+		echo -e ${BLD}' No config file found so creating a fresh one in:'${NRM}
+		echo -e ${BLD}${BLUE}" $CONFIG"${NRM}
+		echo
+		echo -e ${BLD}" Edit this file before invoking $0 again."${NRM}
+		echo -e ${BLD}'------------------------------------------------------------'${NRM}
+		[[ ! -d "$CONFIGDIR" ]] && mkdir -p "$CONFIGDIR"
+		install -m600 $SKEL $CONFIG
+		exit 0
+	fi
+}
 
-# Your username.
-#USERNAME='myusername'
-USERNAME=
+checkconfig() {
+	if [[ ! -f "$CONFIG" ]]; then
+		makeconfig
+		exit 0
+	else
+		. "$CONFIG"
 
-# Your email password.
-# Note that permissions of this file should be 600 to prevent other users
-# on the system from reading this plain text file with your precious password.
-#SMTP_USER_PASS='mypassword'
-SMTP_USER_PASS=
-
-# Return address.
-#FROM='returnaddress@bar.com'
-FROM=
-
-# SMTP server.
-#SMTP='smtp.bar.com'
-SMTP=
-
-# Select which method of authentication you wish to use when sending mails.
-# Valid options are shown below; select one.
-# SSL uses port 465 while STARTTL uses port 587
-#
-#AUTHMODE='SSL'
-#AUTHMODE='STARTTLS'
-AUTHMODE=
-
-# Path to log file.
-LOG="$CONFIGDIR/$LOG"
-
-#LOG="/var/log/$LOG"
-# Note that users wishing to redefine the log from their homedir to /var/log
-# MUST create this file manually and chown it to your user!
-#
-# Example:
-#   touch /var/log/$LOG
-#   chown user:group /var/log/$LOG
-
-# Optionally define an http proxy if behind a firewall.
-# This is only used for curl as it gets your IP address.
-#PROXY="myproxy:myport"
-EOL
-  chmod 600 "$CONFIG"
+		case "$MAILCLIENT" in
+			mailx|MAILX|Mailx|MailX)
+				command -v mailx >/dev/null 2>&1 || {
+				echo -e ${RED}"I require mailx but it's not installed. Aborting."${NRM} >&2
+				exit 1; }
+				[[ ! -f ~/.mailrc ]] && echo -e ${RED}" No mailx config file detected (~/.mailrc)."${NRM} && exit 1
+				export SCRIPTMAILCLIENT=mailx
+				;;
+			mailsend|MAILSEND|Mailsend|MailSend)
+				command -v mailsend >/dev/null 2>&1 || {
+				echo -e ${RED}"I require mailsend but it's not installed. Aborting."${NRM} >&2
+				exit 1; }
+				[[ -z "$TARGETEMAIL" ]] && echo -e ${RED}" Error in config! Define a target email address."${NRM} && exit 1
+				[[ -z "$FROM" ]] && echo -e ${RED}" Error in config! Define a return address."${NRM} && exit 1
+				[[ -z "$SMTP" ]] && echo -e ${RED}" Error in config! Define a STMP server."${NRM} && exit 1
+				[[ -z "$USERNAME" ]] && echo -e ${RED}" Error in config! Define a username."${NRM} && exit 1
+				[[ -z "$SMTP_USER_PASS" ]] && echo -e ${RED}" Error in config! Define a password."${NRM} && exit 1
+				[[ -z "$AUTHMODE" ]] && echo -e ${RED}" Error in config! Define an authentication mode."${NRM} && exit 1
+				export SCRIPTMAILCLIENT=mailsend
+				;;
+			*)
+				echo -e ${RED}" Invalid setting for MAILCLIENT in $CONFIG detected!"${NRM}
+				exit 1
+				;;
+		esac
+	fi
 }
 
 sendmail() {
-	OPTS="-to $TARGETEMAIL -from $FROM -auth -smtp $SMTP +cc +bc -user $USERNAME -pass $SMTP_USER_PASS"
-
 	if [[ -z "$TESTMODE"  ]]; then
 		CURRENTIP=$(cat $DB)
 	else
@@ -72,36 +75,27 @@ sendmail() {
 		CURRENTIP="TEST MODE ONLY"
 	fi
 
-	case "$AUTHMODE" in
-		SSL)
-			mailsend -ssl -port 465 $OPTS -sub "IP address" -M "IP is $CURRENTIP"
-			;;
-		STARTTLS)
-			mailsend -starttls -port 587 $OPTS -sub "IP address" -M "IP is $CURRENTIP"
-			;;
-		NONE)
-			echo 'TODO'
-			;;
-		*)
-			exit 1
-	esac
-}
+	if [[ "$SCRIPTMAILCLIENT" = "mailsend" ]]; then
+		# we are using mailsend not mailx
+		OPTS="-to $TARGETEMAIL -from $FROM -auth -smtp $SMTP +cc +bc -user $USERNAME -pass $SMTP_USER_PASS"
 
-dotest() {
-	OPTS="-v -info -smtp $SMTP"
-	case "$AUTHMODE" in
-		SSL)
-			mailsend -ssl -port 465 $OPTS
-			;;
-		STARTTLS)
-			mailsend -port 587 $OPTS
-			;;
-		NONE)
-			echo 'TODO'
-			;;
-		*)
-			exit 1
-	esac
+		case "$AUTHMODE" in
+			SSL)
+				mailsend -ssl -port 465 $OPTS -sub "IP address" -M "IP is $CURRENTIP"
+				;;
+			STARTTLS)
+				mailsend -starttls -port 587 $OPTS -sub "IP address" -M "IP is $CURRENTIP"
+				;;
+			NONE)
+				echo 'TODO'
+				;;
+			*)
+				exit 1
+		esac
+	elif [[ "$SCRIPTMAILCLIENT" = "mailx" ]]; then
+		# we are using mailx
+		echo "$CURRENTIP" | mailx -A "$MAILX_ACCOUNT_NAME" -s "IP Address" $TARGETEMAIL
+	fi
 }
 
 run() {
@@ -123,11 +117,11 @@ run() {
 	# 3. http://ifconfig.me
 
 	CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
-	
+
 	if [[ -z "$CURRENTIP" ]]; then
 		CURRENTIP=$(curl $PROXY -s http://icanhazip.com/)
 	fi
-	
+
 	if [[ -z "$CURRENTIP" ]]; then
 		CURRENTIP=$(curl $PROXY -s http://ifconfig.me/)
 	fi
@@ -142,7 +136,7 @@ run() {
 
 	if [[ "$CURRENTIP" != "$OLDIP" ]]; then
 		# IP changed
-		CHECK="IP changed, sending mail and updateding db."
+		CHECK="IP changed, sending mail and updating db."
 		echo -e ${BLD}" Current IP differs from IP in database so notifying and updating database."${NRM}
 		writelog
 		echo "$CURRENTIP" > "$DB"
@@ -160,26 +154,6 @@ writelog() {
 	echo -e "$NOW \t $CHECK" >> "$LOG"
 }
 
-checkconfig() {
-	[[ -z $(which mailsend) ]] && echo -e "${RED}Error!${NRM}${BLD} This script requires mailsend to function." && exit 1
-	[[ -z $(which curl) ]] && echo -e "${RED}Error!${NRM}${BLD} This script requires curl to function." && exit 1
-	[[ ! -d "$CONFIGDIR" ]] && mkdir "$CONFIGDIR"
-	if [[ ! -f "$CONFIG" ]]; then
-		makeconfig
-		echo -e " ${BLD}No config file detected so a fresh one has been created."${NRM}
-		echo -e " ${BLD}Please edit it now: ${BLU}$CONFIG"${NRM}
-		exit 0
-	else
-		source "$CONFIG"
-		[[ -z "$TARGETEMAIL" ]] && echo -e ${RED}" Error in config! Define a target email address."${NRM} && exit 1
-		[[ -z "$FROM" ]] && echo -e ${RED}" Error in config! Define a return address."${NRM} && exit 1
-		[[ -z "$SMTP" ]] && echo -e ${RED}" Error in config! Define a STMP server."${NRM} && exit 1
-		[[ -z "$USERNAME" ]] && echo -e ${RED}" Error in config! Define a username."${NRM} && exit 1
-		[[ -z "$SMTP_USER_PASS" ]] && echo -e ${RED}" Error in config! Define a password."${NRM} && exit 1
-		[[ -z "$AUTHMODE" ]] && echo -e ${RED}" Error in config! Define an authentication mode."${NRM} && exit 1
-	fi
-}
-
 greets() {
 	echo -e "${RED}Checkip v$VERS${NRM}"
 	echo
@@ -187,20 +161,12 @@ greets() {
 
 case "$1" in
 	mail|m|M|Mail)
-		greets
 		checkconfig
-		echo -e "${BLD}${RED}Sending test email..."${NRM}${BLD}
+		echo -e "${BLD} Trying to sending test email to ${BLU}$TARGETEMAIL"${NRM}${BLD}
 		export TESTMODE=1
 		sendmail
 		;;
-	test|t|T|Test)
-		greets
-		checkconfig
-		echo -e "${BLD}${RED}Testing SMTP server..."${NRM}${BLD}
-		dotest
-		;;
 	check|c|C|Check)
-		greets
 		checkconfig
 		run
 		;;
@@ -208,9 +174,8 @@ case "$1" in
 		greets
 		checkconfig
 		echo -e " ${BLD}$0 ${NRM}${GRN}[option]${NRM}"
-		echo -e " ${BLD} ${NRM}${GRN}test${NRM}${BLD}	Test smtp server defined in ${NRM}${BLU}${CONFIG}${NRM}${BLD} then exit."${NRM}
-		echo -e " ${BLD} ${NRM}${GRN}mail${NRM}${BLD}	Send a test email and exit."${NRM}
-		echo -e " ${BLD} ${NRM}${GRN}check${NRM}${BLD}	Check IP against IP on record and send mail if different."${NRM}
+		echo -e " ${BLD} ${NRM}${GRN}m${NRM}${BLD}	Send a test email and exit."${NRM}
+		echo -e " ${BLD} ${NRM}${GRN}c${NRM}${BLD}	Check IP against IP on record and send mail if different."${NRM}
 		;;
 esac
 exit 0
