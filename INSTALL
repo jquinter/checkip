@@ -1,5 +1,9 @@
-There is no configure script nor is there anything to compile.
+DEPENDENCIES
+ bash
+ curl
+ heirloom-mailx or mailsend
 
+BUILDING
 Setup the via a make.
 
  $ make
