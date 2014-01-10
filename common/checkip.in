@@ -172,7 +172,7 @@ greets() {
 case "$1" in
 	mail|m|M|Mail)
 		checkconfig
-		echo -e "${BLD} Trying to sending test email to ${BLU}$TARGETEMAIL"${NRM}${BLD}
+		echo -e "${BLD} Trying to send test email to ${BLU}$TARGETEMAIL"${NRM}${BLD}
 		export TESTMODE=1
 		sendmail
 		;;
