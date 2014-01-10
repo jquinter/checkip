@@ -128,7 +128,7 @@ run() {
 		CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
 	fi
 
-	if
+	if [[ -z "$CURRENTIP" ]]; then
 		CURRENTIP=$(curl $PROXY -s http://icanhazip.com/)
 	fi
 
