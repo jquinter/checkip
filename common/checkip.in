@@ -9,6 +9,10 @@ DB="$CONFIGDIR/checkip.db"
 
 export BLD="\e[01m" RED="\e[01;31m" GRN="\e[01;32m" BLU="\e[01;34m" NRM="\e[00m"
 
+command -v dig >/dev/null 2>&1 || {
+echo -e ${RED}"I require dig but it's not installed. Aborting."${NRM} >&2
+exit 1; }
+
 command -v curl >/dev/null 2>&1 || {
 echo -e ${RED}"I require curl but it's not installed. Aborting."${NRM} >&2
 exit 1; }
@@ -111,14 +115,20 @@ run() {
 	fi
 
 	# Get the IP address
-	# Script tries three different websites to do so:
+	# Script tries initially from a DNS server using dig
+
+	CURRENTIP=$(dig +short myip.opendns.com @resolver1.opendns.com)
+
+	# If that fails, it defaults back to using websites
+	# that provide the IP trying all three of these:
 	# 1. http://www.whatsmyip.us
 	# 2. http://icanhazip.com
 	# 3. http://ifconfig.me
-
-	CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
-
 	if [[ -z "$CURRENTIP" ]]; then
+		CURRENTIP=$(curl $PROXY -s http://www.whatsmyip.us/ | grep "</textarea>"| sed 's/[</].*$//')
+	fi
+
+	if
 		CURRENTIP=$(curl $PROXY -s http://icanhazip.com/)
 	fi
 
